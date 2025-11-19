@@ -12,7 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class WeatherAppGUI extends JFrame {
-    private static final String API_KEY = "516e3c242f6e4b94ace25705251911";
+    private static final String API_KEY = "YOUR_API_KEY_HERE"; // Get your free API key from https://www.weatherapi.com/
     private static final String BASE_URL = "http://api.weatherapi.com/v1/current.json";
     private static final String FORECAST_URL = "http://api.weatherapi.com/v1/forecast.json";
     private static final String FAVORITES_FILE = "weather_favorites.txt";
