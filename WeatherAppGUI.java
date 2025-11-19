@@ -12,7 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class WeatherAppGUI extends JFrame {
-    private static final String API_KEY = "YOUR_API_KEY_HERE"; // Get free key from weatherapi.com
+    private static final String API_KEY = "516e3c242f6e4b94ace25705251911";
     private static final String BASE_URL = "http://api.weatherapi.com/v1/current.json";
     private static final String FORECAST_URL = "http://api.weatherapi.com/v1/forecast.json";
     private static final String FAVORITES_FILE = "weather_favorites.txt";
@@ -20,17 +20,28 @@ public class WeatherAppGUI extends JFrame {
     private JTextField cityField;
     private JButton searchButton;
     private JButton addFavoriteButton;
+    private JButton darkModeToggle;
     private JTextArea weatherDisplay;
     private JTextArea hourlyDisplay;
+    private JTextArea weeklyDisplay;
     private JLabel statusLabel;
     private DefaultListModel<String> favoritesModel;
     private JList<String> favoritesList;
     private List<String> favorites;
     private JTabbedPane tabbedPane;
+    private boolean isDarkMode = false;
+    
+    // Color schemes
+    private Color lightBg = new Color(240, 248, 255);
+    private Color lightText = Color.BLACK;
+    private Color lightTextArea = Color.WHITE;
+    private Color darkBg = new Color(45, 45, 48);
+    private Color darkText = new Color(220, 220, 220);
+    private Color darkTextArea = new Color(30, 30, 30);
     
     public WeatherAppGUI() {
         setTitle("Weather App");
-        setSize(750, 500);
+        setSize(800, 550);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
         
@@ -42,12 +53,12 @@ public class WeatherAppGUI extends JFrame {
         JPanel mainPanel = new JPanel();
         mainPanel.setLayout(new BorderLayout(10, 10));
         mainPanel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
-        mainPanel.setBackground(new Color(240, 248, 255));
+        mainPanel.setBackground(lightBg);
         
         // Top panel for search
         JPanel searchPanel = new JPanel();
         searchPanel.setLayout(new FlowLayout(FlowLayout.CENTER, 10, 10));
-        searchPanel.setBackground(new Color(240, 248, 255));
+        searchPanel.setBackground(lightBg);
         
         JLabel promptLabel = new JLabel("Enter City:");
         promptLabel.setFont(new Font("Arial", Font.BOLD, 14));
@@ -67,10 +78,17 @@ public class WeatherAppGUI extends JFrame {
         addFavoriteButton.setForeground(Color.WHITE);
         addFavoriteButton.setFocusPainted(false);
         
+        darkModeToggle = new JButton("🌙 Dark Mode");
+        darkModeToggle.setFont(new Font("Arial", Font.BOLD, 12));
+        darkModeToggle.setBackground(new Color(75, 75, 75));
+        darkModeToggle.setForeground(Color.WHITE);
+        darkModeToggle.setFocusPainted(false);
+        
         searchPanel.add(promptLabel);
         searchPanel.add(cityField);
         searchPanel.add(searchButton);
         searchPanel.add(addFavoriteButton);
+        searchPanel.add(darkModeToggle);
         
         // Create tabbed pane for current and hourly weather
         tabbedPane = new JTabbedPane();
@@ -96,14 +114,25 @@ public class WeatherAppGUI extends JFrame {
         
         JScrollPane hourlyScrollPane = new JScrollPane(hourlyDisplay);
         
+        // Weekly forecast panel
+        weeklyDisplay = new JTextArea();
+        weeklyDisplay.setEditable(false);
+        weeklyDisplay.setFont(new Font("Monospaced", Font.PLAIN, 12));
+        weeklyDisplay.setBackground(Color.WHITE);
+        weeklyDisplay.setBorder(BorderFactory.createLineBorder(new Color(176, 196, 222), 2));
+        weeklyDisplay.setMargin(new Insets(10, 10, 10, 10));
+        
+        JScrollPane weeklyScrollPane = new JScrollPane(weeklyDisplay);
+        
         // Add tabs
         tabbedPane.addTab("☀️ Current Weather", scrollPane);
         tabbedPane.addTab("🕐 Hourly Forecast", hourlyScrollPane);
+        tabbedPane.addTab("📅 7-Day Forecast", weeklyScrollPane);
         
         // Left panel for favorites
         JPanel favoritesPanel = new JPanel();
         favoritesPanel.setLayout(new BorderLayout(5, 5));
-        favoritesPanel.setBackground(new Color(240, 248, 255));
+        favoritesPanel.setBackground(lightBg);
         favoritesPanel.setPreferredSize(new Dimension(180, 0));
         
         JLabel favLabel = new JLabel("⭐ Favorite Cities");
@@ -164,6 +193,8 @@ public class WeatherAppGUI extends JFrame {
         
         removeFavButton.addActionListener(e -> removeFromFavorites());
         
+        darkModeToggle.addActionListener(e -> toggleDarkMode());
+        
         setVisible(true);
     }
     
@@ -180,14 +211,15 @@ public class WeatherAppGUI extends JFrame {
         searchButton.setEnabled(false);
         weatherDisplay.setText("Loading...");
         hourlyDisplay.setText("Loading...");
+        weeklyDisplay.setText("Loading...");
         
         // Use SwingWorker to avoid freezing the UI
         SwingWorker<String[], Void> worker = new SwingWorker<>() {
             @Override
             protected String[] doInBackground() {
                 String currentWeather = getWeather(city);
-                String hourlyForecast = getHourlyForecast(city);
-                return new String[]{currentWeather, hourlyForecast};
+                String forecast = getForecast(city, 7);
+                return new String[]{currentWeather, forecast};
             }
             
             @Override
@@ -195,7 +227,7 @@ public class WeatherAppGUI extends JFrame {
                 try {
                     String[] results = get();
                     String weatherData = results[0];
-                    String hourlyData = results[1];
+                    String forecastData = results[1];
                     
                     if (weatherData != null) {
                         displayWeather(weatherData);
@@ -205,14 +237,17 @@ public class WeatherAppGUI extends JFrame {
                         statusLabel.setText("Error fetching data");
                     }
                     
-                    if (hourlyData != null) {
-                        displayHourlyForecast(hourlyData);
+                    if (forecastData != null) {
+                        displayHourlyForecast(forecastData);
+                        displayWeeklyForecast(forecastData);
                     } else {
                         hourlyDisplay.setText("Failed to fetch hourly forecast.");
+                        weeklyDisplay.setText("Failed to fetch 7-day forecast.");
                     }
                 } catch (Exception e) {
                     weatherDisplay.setText("Error: " + e.getMessage());
                     hourlyDisplay.setText("Error: " + e.getMessage());
+                    weeklyDisplay.setText("Error: " + e.getMessage());
                     statusLabel.setText("Error occurred");
                 }
                 searchButton.setEnabled(true);
@@ -250,10 +285,10 @@ public class WeatherAppGUI extends JFrame {
         }
     }
     
-    private String getHourlyForecast(String city) {
+    private String getForecast(String city, int days) {
         try {
             String encodedCity = URLEncoder.encode(city, StandardCharsets.UTF_8);
-            String urlString = FORECAST_URL + "?key=" + API_KEY + "&q=" + encodedCity + "&hours=24";
+            String urlString = FORECAST_URL + "?key=" + API_KEY + "&q=" + encodedCity + "&days=" + days;
             
             HttpClient client = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(5))
@@ -399,6 +434,194 @@ public class WeatherAppGUI extends JFrame {
             
         } catch (Exception e) {
             hourlyDisplay.setText("Error parsing hourly forecast: " + e.getMessage());
+        }
+    }
+    
+    private void displayWeeklyForecast(String jsonResponse) {
+        try {
+            // Extract city name
+            String cityName = extractValue(jsonResponse, "\"name\":\"", "\"");
+            
+            StringBuilder display = new StringBuilder();
+            display.append("╔════════════════════════════════════════════════════════╗\n");
+            display.append("                  7-DAY WEATHER FORECAST\n");
+            display.append("  📍 ").append(cityName).append("\n");
+            display.append("╚════════════════════════════════════════════════════════╝\n\n");
+            
+            // Find the forecastday array
+            int forecastIndex = jsonResponse.indexOf("\"forecastday\":[");
+            if (forecastIndex == -1) {
+                weeklyDisplay.setText("No forecast data available.");
+                return;
+            }
+            
+            String forecastData = jsonResponse.substring(forecastIndex);
+            
+            // Parse each day
+            int startPos = 0;
+            int dayCount = 0;
+            
+            while (dayCount < 7) {
+                // Get date
+                int dateStart = forecastData.indexOf("\"date\":\"", startPos);
+                if (dateStart == -1) break;
+                dateStart += 8;
+                int dateEnd = forecastData.indexOf("\"", dateStart);
+                String date = forecastData.substring(dateStart, dateEnd);
+                
+                // Get max temp
+                int maxTempStart = forecastData.indexOf("\"maxtemp_c\":", dateEnd);
+                if (maxTempStart == -1) break;
+                maxTempStart += 12;
+                int maxTempEnd = forecastData.indexOf(",", maxTempStart);
+                String maxTemp = forecastData.substring(maxTempStart, maxTempEnd).trim();
+                
+                // Get min temp
+                int minTempStart = forecastData.indexOf("\"mintemp_c\":", maxTempEnd);
+                if (minTempStart == -1) break;
+                minTempStart += 12;
+                int minTempEnd = forecastData.indexOf(",", minTempStart);
+                String minTemp = forecastData.substring(minTempStart, minTempEnd).trim();
+                
+                // Get condition
+                int condStart = forecastData.indexOf("\"text\":\"", minTempEnd);
+                if (condStart == -1) break;
+                condStart += 8;
+                int condEnd = forecastData.indexOf("\"", condStart);
+                String condition = forecastData.substring(condStart, condEnd);
+                
+                // Get chance of rain
+                int rainStart = forecastData.indexOf("\"daily_chance_of_rain\":", condEnd);
+                String chanceRain = "0";
+                if (rainStart != -1) {
+                    rainStart += 23;
+                    int rainEnd = forecastData.indexOf(",", rainStart);
+                    if (rainEnd == -1) rainEnd = forecastData.indexOf("}", rainStart);
+                    chanceRain = forecastData.substring(rainStart, rainEnd).trim();
+                }
+                
+                // Format output
+                display.append(String.format("%-12s │ %s %-18s\n", 
+                    date, 
+                    getWeatherIcon(condition),
+                    condition.length() > 18 ? condition.substring(0, 15) + "..." : condition));
+                display.append(String.format("             │ 🌡️  %s°C - %s°C  │  💧 %s%%\n\n",
+                    minTemp, maxTemp, chanceRain));
+                
+                if (dayCount < 6) {
+                    display.append("─────────────┴────────────────────────────────────────\n\n");
+                }
+                
+                startPos = condEnd;
+                dayCount++;
+            }
+            
+            weeklyDisplay.setText(display.toString());
+            
+        } catch (Exception e) {
+            weeklyDisplay.setText("Error parsing weekly forecast: " + e.getMessage());
+        }
+    }
+    
+    private void toggleDarkMode() {
+        isDarkMode = !isDarkMode;
+        
+        if (isDarkMode) {
+            darkModeToggle.setText("☀️ Light Mode");
+            applyDarkMode();
+        } else {
+            darkModeToggle.setText("🌙 Dark Mode");
+            applyLightMode();
+        }
+    }
+    
+    private void applyDarkMode() {
+        // Main panels
+        Container contentPane = getContentPane();
+        for (Component comp : contentPane.getComponents()) {
+            if (comp instanceof JPanel) {
+                applyDarkModeToPanel((JPanel) comp);
+            }
+        }
+        
+        // Text areas
+        weatherDisplay.setBackground(darkTextArea);
+        weatherDisplay.setForeground(darkText);
+        hourlyDisplay.setBackground(darkTextArea);
+        hourlyDisplay.setForeground(darkText);
+        weeklyDisplay.setBackground(darkTextArea);
+        weeklyDisplay.setForeground(darkText);
+        
+        // Favorites list
+        favoritesList.setBackground(darkTextArea);
+        favoritesList.setForeground(darkText);
+        
+        // City field
+        cityField.setBackground(darkTextArea);
+        cityField.setForeground(darkText);
+        cityField.setCaretColor(darkText);
+        
+        // Tabbed pane
+        tabbedPane.setBackground(darkBg);
+        tabbedPane.setForeground(darkText);
+        
+        // Status label
+        statusLabel.setForeground(darkText);
+    }
+    
+    private void applyLightMode() {
+        // Main panels
+        Container contentPane = getContentPane();
+        for (Component comp : contentPane.getComponents()) {
+            if (comp instanceof JPanel) {
+                applyLightModeToPanel((JPanel) comp);
+            }
+        }
+        
+        // Text areas
+        weatherDisplay.setBackground(lightTextArea);
+        weatherDisplay.setForeground(lightText);
+        hourlyDisplay.setBackground(lightTextArea);
+        hourlyDisplay.setForeground(lightText);
+        weeklyDisplay.setBackground(lightTextArea);
+        weeklyDisplay.setForeground(lightText);
+        
+        // Favorites list
+        favoritesList.setBackground(lightTextArea);
+        favoritesList.setForeground(lightText);
+        
+        // City field
+        cityField.setBackground(Color.WHITE);
+        cityField.setForeground(lightText);
+        cityField.setCaretColor(lightText);
+        
+        // Tabbed pane
+        tabbedPane.setBackground(lightBg);
+        tabbedPane.setForeground(lightText);
+        
+        // Status label
+        statusLabel.setForeground(new Color(100, 100, 100));
+    }
+    
+    private void applyDarkModeToPanel(JPanel panel) {
+        panel.setBackground(darkBg);
+        for (Component comp : panel.getComponents()) {
+            if (comp instanceof JPanel) {
+                applyDarkModeToPanel((JPanel) comp);
+            } else if (comp instanceof JLabel) {
+                comp.setForeground(darkText);
+            }
+        }
+    }
+    
+    private void applyLightModeToPanel(JPanel panel) {
+        panel.setBackground(lightBg);
+        for (Component comp : panel.getComponents()) {
+            if (comp instanceof JPanel) {
+                applyLightModeToPanel((JPanel) comp);
+            } else if (comp instanceof JLabel) {
+                comp.setForeground(lightText);
+            }
         }
     }
     
