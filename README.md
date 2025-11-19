@@ -2,8 +2,6 @@
 
 A feature-rich Java Swing weather application that displays current weather, hourly forecasts, and 7-day forecasts with a beautiful dark mode.
 
-![Weather App Screenshot](screenshot.png)
-
 ## ✨ Features
 
 - 🌤️ **Current Weather Display** - Real-time weather with visual icons
